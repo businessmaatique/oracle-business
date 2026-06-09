@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oracle Business — Business Mâatique</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #FDFAF4; font-family: Georgia, serif; color: #2D1A4A; }
+textarea, input, button, select { font-family: sans-serif; }
+textarea:focus, input:focus { outline: 2px solid #7B5EA744; }
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef } = React;
+
+const GOLD = "#C9A84C";
+const VIOLET = "#7B5EA7";
+const VIOLET_LIGHT = "#EDE7F6";
+const CREAM = "#FDFAF4";
+const GOLD_LIGHT = "#FBF4E0";
+
+const UPLOADS = [
+  { key: "astral", label: "Thème astral", sub: "PDF, image ou texte", icon: "🌠" },
+  { key: "hd", label: "Human Design", sub: "PDF, image ou texte", icon: "⬡" },
+  { key: "gk", label: "Gene Keys", sub: "PDF, image ou texte", icon: "🧬" },
+];
+const ACCEPT = ".pdf,.jpg,.jpeg,.png,.webp,.txt";
+
+const CONTEXT_FIELDS = [
+  { key: "activite", label: "Ton activité / thématique", placeholder: "Ex : coach en développement personnel, thérapeute holistique…" },
+  { key: "stade", label: "Où en es-tu dans ton business ?", placeholder: "Ex : je démarre, j'ai quelques clients mais pas de système…" },
+  { key: "offre", label: "Ton offre actuelle (si tu en as une)", placeholder: "Ex : séances individuelles à 80€, programme en ligne à 497€…" },
+  { key: "probleme", label: "Ton problème principal en ce moment", placeholder: "Ex : je n'arrive pas à trouver des clients, j'ai peur de vendre…" },
+  { key: "objectif", label: "Ton objectif dans les 6 prochains mois", placeholder: "Ex : atteindre 3000€/mois, lancer mon premier programme…" },
+  { key: "audience", label: "Ton audience actuelle", placeholder: "Ex : 500 abonnés Instagram, liste email de 200 personnes…" },
+  { key: "extra", label: "Autre chose à partager avec l'Oracle ?", placeholder: "Tes peurs, tes rêves, ce qui te bloque vraiment…" },
+];
+
+const PART1 = [
+  { key: "astro_synth", label: "Astrologie & Business", icon: "🌠" },
+  { key: "hd_synth", label: "Human Design & Business", icon: "⬡" },
+  { key: "gk_synth", label: "Gene Keys & Business", icon: "🧬" },
+];
+const PART2 = [
+  { key: "identite", label: "Identité & Positionnement", icon: "🏛️" },
+  { key: "mission", label: "Mission de vie & Pourquoi profond", icon: "🔱" },
+  { key: "cible", label: "Client idéal & Avatars", icon: "🎯" },
+  { key: "douleurs", label: "Douleurs & Besoins profonds à résoudre", icon: "💔" },
+  { key: "transformation", label: "Transformations & Résultats concrets", icon: "✨" },
+  { key: "dons", label: "Dons, Talents & Forces uniques", icon: "🌟" },
+  { key: "offres", label: "Types d'offres & Structure recommandée", icon: "🎁" },
+  { key: "vente", label: "Stratégie de vente & Tunnel naturel", icon: "💎" },
+  { key: "marketing", label: "Stratégie marketing & Canaux clés", icon: "📡" },
+  { key: "contenu", label: "Stratégie de contenu & Thèmes forts", icon: "📣" },
+  { key: "sabotage", label: "Faiblesses, Ombres & Auto-sabotage", icon: "🌑" },
+  { key: "forces", label: "Forces de coach & Ce que les clients ressentent", icon: "⚡" },
+  { key: "actions", label: "3 actions prioritaires maintenant", icon: "🚀" },
+];
+
+const COACHING_TEMPLATE = (nom) => `Tu es mon coach business spirituel personnel. Tu t'appelles l'Oracle Business Mâatique.
+
+Voici mon rapport Oracle Business complet. Mémorise-le entièrement.
+
+[COLLE TON RAPPORT ICI]
+
+Coache-moi en te basant UNIQUEMENT sur mon profil unique. Jamais de conseils génériques.
+
+Tu peux m'aider à : construire mes offres, rédiger mes pages de vente et emails, créer mon contenu, travailler mes croyances, prendre des décisions business alignées.
+
+Commence par résumer en 3 phrases qui je suis, puis demande-moi sur quoi travailler aujourd'hui.`;
+
+const SYSTEM = `Tu es l'Oracle Business Mâatique, consultant spirituel et stratège business d'élite.
+Tu reçois 3 documents sacrés (thème astral, Human Design, Gene Keys) ET le contexte business actuel.
+Génère un rapport ultra-personnalisé, concret et actionnable.
+Réponds UNIQUEMENT en JSON valide, sans markdown, sans texte avant ou après.
+Format exact :
+{"nom":"prénom ou Voyageur(e)","astro_synth":"...","hd_synth":"...","gk_synth":"...","identite":"...","mission":"...","cible":"...","douleurs":"...","transformation":"...","dons":"...","offres":"...","vente":"...","marketing":"...","contenu":"...","sabotage":"...","forces":"...","actions":"..."}
+RÈGLE ABSOLUE : 80 mots max par valeur. JSON 100% complet et fermé.`;
+
+function fileToBase64(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(",")[1]);
+    r.onerror = () => rej(new Error("Erreur"));
+    r.readAsDataURL(f);
+  });
+}
+
+function getBlock(file, b64) {
+  if (file.type.startsWith("image/")) return { type:"image", source:{ type:"base64", media_type:file.type, data:b64 } };
+  return { type:"document", source:{ type:"base64", media_type:"application/pdf", data:b64 } };
+}
+
+function copyText(text) {
+  const ta = document.createElement("textarea");
+  ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
+  document.body.appendChild(ta); ta.select();
+  document.execCommand("copy"); document.body.removeChild(ta);
+}
+
+function buildReportText(report) {
+  const all = [...PART1.map(s=>({...s,part:"PARTIE I"})), ...PART2.map(s=>({...s,part:"PARTIE II"}))];
+  let t = `🔮 ORACLE BUSINESS MAATIQUE\n${report.nom.toUpperCase()}\n${"=".repeat(40)}\n\n`;
+  let last = "";
+  all.forEach(s => {
+    if (s.part !== last) { t += `\n✦ ${s.part} ✦\n${"─".repeat(30)}\n\n`; last = s.part; }
+    t += `${s.icon} ${s.label.toUpperCase()}\n${report[s.key]||"—"}\n\n`;
+  });
+  return t + `${"=".repeat(40)}\nOracle Business — Business Maatique`;
+}
+
+function Section({ label, icon, content, defaultOpen }) {
+  const [open, setOpen] = useState(!!defaultOpen);
+  return (
+    <div style={{ marginBottom:10, border:`1px solid ${GOLD}44`, borderRadius:10, overflow:"hidden", background:"#fff" }}>
+      <div onClick={() => setOpen(o=>!o)} style={{ padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", cursor:"pointer", background: open ? VIOLET_LIGHT : "#fff", borderBottom: open ? `1px solid ${GOLD}33` : "none" }}>
+        <span style={{ fontSize:13, fontFamily:"sans-serif", fontWeight:600, color:VIOLET, display:"flex", alignItems:"center", gap:8 }}>
+          <span style={{fontSize:16}}>{icon}</span>{label}
+        </span>
+        <span style={{ fontSize:13, color:GOLD, transform: open?"rotate(180deg)":"rotate(0)", transition:"transform 0.2s" }}>▼</span>
+      </div>
+      {open && <div style={{ padding:"14px 16px", fontSize:14, lineHeight:1.8, color:"#2D1A4A", whiteSpace:"pre-wrap" }}>{content}</div>}
+    </div>
+  );
+}
+
+function Spinner() {
+  const msgs = ["Les astres se consultent…","Le temple s'éveille…","L'oracle décode ta mission…","Ton rapport se tisse…"];
+  const [i, setI] = useState(0);
+  React.useEffect(() => { const t = setInterval(()=>setI(x=>(x+1)%msgs.length),2200); return ()=>clearInterval(t); }, []);
+  return (
+    <div style={{textAlign:"center",padding:"3rem 1.5rem"}}>
+      <div style={{width:36,height:36,border:`3px solid ${GOLD_LIGHT}`,borderTop:`3px solid ${GOLD}`,borderRadius:"50%",animation:"spin 1s linear infinite",margin:"0 auto 16px"}}/>
+      <p style={{fontSize:14,color:VIOLET,fontStyle:"italic"}}>{msgs[i]}</p>
+    </div>
+  );
+}
+
+function App() {
+  const [files, setFiles] = useState({astral:null,hd:null,gk:null});
+  const [context, setContext] = useState({activite:"",stade:"",offre:"",probleme:"",objectif:"",audience:"",extra:""});
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [report, setReport] = useState(null);
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+  const [tplCopied, setTplCopied] = useState(false);
+  const refs = {astral:useRef(),hd:useRef(),gk:useRef()};
+  const allFiles = files.astral && files.hd && files.gk;
+
+  function reset() {
+    setReport(null); setError(""); setCopied(false); setTplCopied(false); setStep(1);
+    setFiles({astral:null,hd:null,gk:null});
+    setContext({activite:"",stade:"",offre:"",probleme:"",objectif:"",audience:"",extra:""});
+  }
+
+  async function generate() {
+    setLoading(true); setError(""); setReport(null);
+    try {
+      const [ab,hb,gb] = await Promise.all([fileToBase64(files.astral),fileToBase64(files.hd),fileToBase64(files.gk)]);
+      const ctxText = CONTEXT_FIELDS.filter(f=>context[f.key]?.trim()).map(f=>`${f.label} : ${context[f.key]}`).join("\n");
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          model:"claude-sonnet-4-20250514",
+          max_tokens:4000,
+          system:SYSTEM,
+          messages:[{role:"user",content:[
+            getBlock(files.astral,ab),
+            getBlock(files.hd,hb),
+            getBlock(files.gk,gb),
+            {type:"text",text:`Contexte business :\n${ctxText||"Non renseigné."}\n\nGénère mon rapport Oracle Business Mâatique complet.`}
+          ]}]
+        })
+      });
+      const data = await res.json();
+      if (data.error) { setError(`Erreur : ${data.error.message}`); setLoading(false); return; }
+      const raw = data.content?.find(b=>b.type==="text")?.text||"";
+      let clean = raw.replace(/```json|```/g,"").trim();
+      let parsed;
+      try { parsed = JSON.parse(clean); }
+      catch {
+        const op=(clean.match(/{/g)||[]).length, cl=(clean.match(/}/g)||[]).length;
+        clean=clean.replace(/,\s*$/,"");
+        for(let i=0;i<op-cl;i++) clean+="}";
+        try { parsed=JSON.parse(clean); } catch { setError(`JSON invalide : ${raw.slice(0,200)}`); setLoading(false); return; }
+      }
+      setReport(parsed);
+    } catch(e) { setError(`Erreur : ${e.message}`); }
+    finally { setLoading(false); }
+  }
+
+  const btn = (disabled, label, onClick, style={}) => (
+    <button onClick={onClick} disabled={disabled} style={{display:"block",width:"100%",padding:"13px",background:disabled?"#E8E0F0":VIOLET,color:disabled?"#B0A0C8":"#fff",border:"none",borderRadius:10,fontSize:14,cursor:disabled?"not-allowed":"pointer",marginTop:8,...style}}>{label}</button>
+  );
+
+  return (
+    <div style={{background:CREAM,minHeight:"100vh",padding:"0 0 3rem",fontFamily:"Georgia,serif",color:"#2D1A4A"}}>
+      {/* HERO */}
+      <div style={{textAlign:"center",padding:"2.5rem 1.5rem 1.5rem",borderBottom:`1px solid ${GOLD}33`,background:`linear-gradient(180deg,${GOLD_LIGHT} 0%,${CREAM} 100%)`}}>
+        <p style={{fontSize:11,letterSpacing:3,color:GOLD,textTransform:"uppercase",marginBottom:8,fontFamily:"sans-serif"}}>Business Mâatique</p>
+        <h1 style={{fontSize:28,fontWeight:"normal",color:"#2D1A4A",margin:"0 0 6px"}}>🔮 L'Oracle Business</h1>
+        <p style={{fontSize:14,color:VIOLET,fontStyle:"italic"}}>Entre dans le temple de ta mission entrepreneuriale</p>
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,margin:"12px 0 0",color:GOLD,fontSize:18}}>✦ ✦ ✦</div>
+      </div>
+
+      {/* STEP BAR */}
+      {!report && !loading && (
+        <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,margin:"1.5rem 0 0",fontFamily:"sans-serif"}}>
+          {[["1","Documents"],["2","Contexte"],["3","Rapport"]].map(([n,lbl],i) => (
+            <React.Fragment key={n}>
+              {i>0 && <div style={{width:40,height:1,background:"#E8E0F0"}}/>}
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <div style={{width:28,height:28,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:600,background:step>i+1?GOLD:step===i+1?VIOLET:"#E8E0F0",color:step>=i+1?"#fff":"#B0A0C8"}}>{step>i+1?"✓":n}</div>
+                <span style={{fontSize:10,color:step===i+1?VIOLET:"#B0A0C8",letterSpacing:1,textTransform:"uppercase"}}>{lbl}</span>
+              </div>
+            </React.Fragment>
+          ))}
+        </div>
+      )}
+
+      {/* ÉTAPE 1 */}
+      {step===1 && !loading && (
+        <div style={{maxWidth:620,margin:"2rem auto 0",padding:"0 1.5rem"}}>
+          <p style={{fontSize:11,letterSpacing:2,color:GOLD,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:16,textAlign:"center"}}>Dépose tes documents sacrés</p>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:12,marginBottom:20}}>
+            {UPLOADS.map(u => (
+              <div key={u.key} onClick={()=>refs[u.key].current.click()} style={{border:`1px solid ${files[u.key]?GOLD:"#D4C8F0"}`,borderRadius:12,padding:"16px 10px",textAlign:"center",cursor:"pointer",background:files[u.key]?GOLD_LIGHT:"#fff",position:"relative",minHeight:90,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",gap:6}}>
+                {files[u.key] && <div style={{position:"absolute",top:6,right:6,width:16,height:16,background:GOLD,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:10,color:"#fff"}}>✓</div>}
+                <span style={{fontSize:24}}>{u.icon}</span>
+                <span style={{fontSize:11,fontFamily:"sans-serif",color:"#5A4080",fontWeight:600,lineHeight:1.3}}>{u.label}</span>
+                <span style={{fontSize:10,fontFamily:"sans-serif",color:"#9A88B8"}}>{files[u.key]?files[u.key].name.slice(0,16)+"…":u.sub}</span>
+                <input ref={refs[u.key]} type="file" accept={ACCEPT} style={{display:"none"}} onChange={e=>e.target.files[0]&&setFiles(f=>({...f,[u.key]:e.target.files[0]}))} />
+              </div>
+            ))}
+          </div>
+          <p style={{fontSize:11,color:"#9A88B8",fontFamily:"sans-serif",textAlign:"center",marginBottom:16}}>Formats acceptés : PDF · JPG · PNG · TXT</p>
+          {btn(!allFiles, allFiles?"Continuer → Renseigner mon contexte":"Dépose tes 3 documents pour continuer", ()=>setStep(2))}
+        </div>
+      )}
+
+      {/* ÉTAPE 2 */}
+      {step===2 && !loading && (
+        <div style={{maxWidth:620,margin:"2rem auto 0",padding:"0 1.5rem"}}>
+          <p style={{fontSize:11,letterSpacing:2,color:GOLD,textTransform:"uppercase",fontFamily:"sans-serif",marginBottom:8,textAlign:"center"}}>Ton contexte business</p>
+          <p style={{fontSize:13,color:VIOLET,fontFamily:"sans-serif",textAlign:"center",marginBottom:20,fontStyle:"italic"}}>Plus tu es précis(e), plus l'Oracle sera juste. Tous les champs sont optionnels.</p>
+          {CONTEXT_FIELDS.map(f => (
+            <div key={f.key} style={{marginBottom:16}}>
+              <label style={{fontSize:11,letterSpacing:1.5,color:GOLD,textTransform:"uppercase",fontFamily:"sans-serif",display:"block",marginBottom:6}}>{f.label}</label>
+              <textarea style={{width:"100%",padding:"10px 14px",border:`1px solid ${VIOLET}44`,borderRadius:8,fontSize:13,color:"#2D1A4A",background:"#fff",resize:"vertical",minHeight:60,lineHeight:1.6}} placeholder={f.placeholder} value={context[f.key]} onChange={e=>setContext(c=>({...c,[f.key]:e.target.value}))} />
+            </div>
+          ))}
+          {error && <div style={{background:"#FFF0F0",border:"1px solid #F5C1C1",borderRadius:8,padding:"12px 16px",color:"#8B2020",fontSize:12,fontFamily:"sans-serif",marginBottom:12}}>{error}</div>}
+          {btn(false,"✨ Révèle ma mission & stratégie", generate)}
+          <button onClick={()=>setStep(1)} style={{display:"block",width:"100%",padding:"11px",background:"transparent",color:VIOLET,border:`1px solid ${VIOLET}44`,borderRadius:10,fontSize:13,fontFamily:"sans-serif",cursor:"pointer",marginTop:10}}>← Retour aux documents</button>
+        </div>
+      )}
+
+      {loading && <Spinner />}
+
+      {/* RAPPORT */}
+      {report && (
+        <div style={{maxWidth:640,margin:"2rem auto 0",padding:"0 1.5rem"}}>
+          <div style={{textAlign:"center",marginBottom:"1.5rem",paddingBottom:"1rem",borderBottom:`1px solid ${GOLD}44`}}>
+            <h2 style={{fontSize:22,color:"#2D1A4A",fontWeight:"normal",marginBottom:4}}>Rapport Oracle de {report.nom}</h2>
+            <p style={{fontSize:12,color:GOLD,fontFamily:"sans-serif",letterSpacing:1}}>✦ RÉVÉLATION BUSINESS MÂATIQUE ✦</p>
+          </div>
+
+          <p style={{fontSize:11,letterSpacing:3,color:GOLD,textTransform:"uppercase",fontFamily:"sans-serif",margin:"1.5rem 0 0.75rem",textAlign:"center"}}>✦ Partie I — Fondations Sacrées ✦</p>
+          {PART1.map((s,i)=><Section key={s.key} label={s.label} icon={s.icon} content={report[s.key]||"—"} defaultOpen={i===0}/>)}
+
+          <p style={{fontSize:11,letterSpacing:3,color:GOLD,textTransform:"uppercase",fontFamily:"sans-serif",margin:"1.5rem 0 0.75rem",textAlign:"center"}}>✦ Partie II — Oracle Business ✦</p>
+          {PART2.map(s=><Section key={s.key} label={s.label} icon={s.icon} content={report[s.key]||"—"}/>)}
+
+          <div style={{display:"flex",gap:12,marginTop:"1.5rem",flexWrap:"wrap"}}>
+            <button onClick={reset} style={{flex:1,padding:"10px 20px",background:"transparent",color:VIOLET,border:`1px solid ${VIOLET}`,borderRadius:8,fontSize:13,fontFamily:"sans-serif",cursor:"pointer",minWidth:140}}>↺ Nouvelle lecture</button>
+            <button onClick={()=>{copyText(buildReportText(report));setCopied(true);setTimeout(()=>setCopied(false),2500);}} style={{flex:1,padding:"10px 20px",background:GOLD,color:"#fff",border:"none",borderRadius:8,fontSize:13,fontFamily:"sans-serif",cursor:"pointer",minWidth:140}}>
+              {copied?"✅ Rapport copié !":"📋 Copier le rapport"}
+            </button>
+          </div>
+
+          <div style={{marginTop:"2rem",border:`2px solid ${GOLD}`,borderRadius:12,overflow:"hidden"}}>
+            <div style={{background:GOLD,padding:"14px 18px"}}>
+              <p style={{margin:0,fontSize:11,letterSpacing:3,color:"#fff",textTransform:"uppercase",fontFamily:"sans-serif"}}>✦ Partie III — Ton Coach IA Personnel</p>
+            </div>
+            <div style={{padding:"18px",background:GOLD_LIGHT}}>
+              <p style={{fontSize:14,lineHeight:1.8,margin:"0 0 4px",color:"#2D1A4A"}}><strong>Étape 1</strong> — Copie ton rapport (bouton ci-dessus)</p>
+              <p style={{fontSize:14,lineHeight:1.8,margin:"0 0 4px",color:"#2D1A4A"}}><strong>Étape 2</strong> — Copie le template de coaching ci-dessous</p>
+              <p style={{fontSize:14,lineHeight:1.8,margin:"0 0 16px",color:"#2D1A4A"}}><strong>Étape 3</strong> — Colle les deux dans <strong>Claude.ai</strong>, ChatGPT ou l'IA de ton choix pour un coaching illimité et aligné avec ton profil.</p>
+              <div style={{background:"#fff",border:`1px solid ${GOLD}55`,borderRadius:8,padding:"14px 16px",fontFamily:"monospace",fontSize:12,lineHeight:1.7,color:"#2D1A4A",whiteSpace:"pre-wrap",marginBottom:12}}>
+                {COACHING_TEMPLATE(report.nom)}
+              </div>
+              <button onClick={()=>{copyText(COACHING_TEMPLATE(report.nom));setTplCopied(true);setTimeout(()=>setTplCopied(false),2500);}} style={{background:VIOLET,color:"#fff",border:"none",borderRadius:8,padding:"12px 20px",width:"100%",fontSize:13,fontFamily:"sans-serif",cursor:"pointer"}}>
+                {tplCopied?"✅ Template copié !":"📋 Copier le template de coaching"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+ReactDOM.render(<App/>, document.getElementById("root"));
+</script>
+</body>
+</html>
