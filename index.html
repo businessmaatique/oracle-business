@@ -168,7 +168,11 @@ function App() {
       const ctxText = CONTEXT_FIELDS.filter(f=>context[f.key]?.trim()).map(f=>`${f.label} : ${context[f.key]}`).join("\n");
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
-        headers:{"Content-Type":"application/json"},
+        headers:{
+  "Content-Type":"application/json",
+  "x-api-key":"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",
+  "anthropic-version":"2023-06-01"
+},
         body:JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:4000,
